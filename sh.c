@@ -31,7 +31,7 @@ struct execcmd {
 };
 
 struct redircmd {
-    int type;		    // < or > 
+    int type;		    // < or >
     struct cmd *cmd;	// the command to be run (e.g., an execcmd)
     char *file;			// the input/output file
     int mode;			// the mode to open the file with
@@ -74,10 +74,12 @@ void runcmd(struct cmd *cmd)
 
         case REDIR:
             rcmd = (struct redircmd *) cmd;
-            
-            close(rcmd->fd);    
+            close(rcmd->fd);
             int fd = open(rcmd->file, rcmd->mode, 0644);
-            
+             if (fd < 0) {
+                perror(rcmd->file);
+                exit(1);
+            }
             runcmd(rcmd->cmd);
             break;
 
