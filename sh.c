@@ -66,14 +66,28 @@ void runcmd(struct cmd *cmd)
             ecmd = (struct execcmd *) cmd;
             if (ecmd->argv[0] == 0)
                 exit(0);
-            fprintf(stderr, "exec not implemented\n");
-            // Your code here ...
+            execvp(ecmd->argv[0], ecmd->argv);
+            perror("execvp");
+            exit(1);
+
             break;
 
         case REDIR:
-            fprintf(stderr, "redir not implemented\n");
-            // Your code here ...
             rcmd = (struct redircmd *) cmd;
+            
+            int fd = open(rcmd->file, rcmd->mode, 0644);
+
+            if(fd < 0) {
+                perror("No se pudo abrir el archivo");
+                exit(1);
+            }
+
+            if(dup2(fd, rcmd->fd) < 0) {
+                perror("dup2");
+                exit(1);
+            }
+
+            close(fd);
             runcmd(rcmd->cmd);
             break;
 
