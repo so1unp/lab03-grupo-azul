@@ -8,75 +8,91 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
+#include <string.h>
 
-void manejador_kill(int sig) {
-    (void)sig;
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    long int ms = (long int)(now.tv_sec * 1000L + now.tv_nsec / 1000000L);
-    printf("Child %d (nice %2d) : \t%ld ms\n", getpid(), getpriority(PRIO_PROCESS, 0), ms);
-    exit(EXIT_SUCCESS);
+static struct timespec child_start;
+
+void handler(int sig) {
+    if (sig == SIGTERM) {
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        long seconds = now.tv_sec - child_start.tv_sec;
+        printf("Child %d (nice %2d):\t%3ld\n", 
+               getpid(), 
+               getpriority(PRIO_PROCESS, 0), 
+               seconds);
+        fflush(stdout);
+        exit(EXIT_SUCCESS);
+    }
 }
 
-int busywork(void)
-{
+int busywork(void) {
     struct tms buf;
     for (;;) {
         times(&buf);
     }
 }
 
-int main(int argc, char *argv[])
-{   
-    struct sigaction sa;
-
-    sa.sa_handler = manejador_kill;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    
-    if (sigaction(SIGTERM, &sa, NULL) == -1) {
-
-        perror("Error registrando sigaction");
-        return  1;
-    }
-
+int main(int argc, char *argv[]) {
     if (argc != 4) {
-        fprintf(stderr, "Uso: %s [s|f] origen destino\n", argv[0]);
+        fprintf(stderr, "Uso: %s <num_hijos> <segundos> <reducir_prioridad(0/1)>\n", argv[0]);
         return EXIT_FAILURE;
     }
     
-
-    int priority = atoi(argv[3]);
-    int childsWants = atoi(argv[1]);
-    int childsId[childsWants];
-
-    for (int i = 0; i < childsWants; i++ ) {
-        childsId[i] = fork();
-        if (childsId[i] == 0) {
-            if(priority){
-                if (i>19)
-                {
-                    setpriority(PRIO_PROCESS, 0, 19);
-                }else{
-                    setpriority(PRIO_PROCESS, 0, i);
-                }
-                                 
-            } 
-                    
-            busywork();
-            exit(EXIT_SUCCESS);
-        }
+    int n_hijos = atoi(argv[1]);
+    int segundos = atoi(argv[2]);
+    int reducir = atoi(argv[3]);
+    
+    pid_t hijos[n_hijos];
+    
+    struct sigaction sa;
+    sa.sa_handler = handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    if (sigaction(SIGTERM, &sa, NULL) == -1) {
+        perror("sigaction");
+        return EXIT_FAILURE;
     }
-    if (atoi(argv[2]) > 0 ){
-
-        sleep((unsigned int)(atoi(argv[2])));
+    
+    for (int i = 0; i < n_hijos; i++) {
+        pid_t pid = fork();
+        if (pid == -1) {
+            perror("fork");
+            return EXIT_FAILURE;
+        }
+        
+        if (pid == 0) { 
+            clock_gettime(CLOCK_MONOTONIC, &child_start);
             
-    }else{
-        pause();
-    }
-    for (int i = 0; i < childsWants; i++)
-        {
-            kill(childsId[i], SIGTERM);
+            if (reducir == 1) {
+                int nice_val = 19 - i;
+                if (setpriority(PRIO_PROCESS, 0, nice_val) == -1) {
+                    perror("setpriority");
+                }
+            }
+            
+            busywork();
+            exit(EXIT_SUCCESS); 
         }
-    exit(EXIT_SUCCESS);
+        
+        hijos[i] = pid;
+    }
+    
+    if (segundos > 0) {
+        sleep((unsigned int)segundos);  
+    } else {
+        while (1) {
+            pause();
+        }
+    }
+    
+    for (int j = 0; j < n_hijos; j++) {
+        kill(hijos[j], SIGTERM);
+    }
+    
+    for (int k = 0; k < n_hijos; k++) {
+        waitpid(hijos[k], NULL, 0);
+    }
+    
+    return EXIT_SUCCESS;
 }
