@@ -2,24 +2,21 @@
 #define _XOPEN_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/times.h>      // times()
-#include <time.h>         // clock_gettime()
+#include <sys/times.h>
+#include <time.h>
 #include <unistd.h>
-#include <signal.h>        // sigaction()
-#include <sys/wait.h>      // wait()
-#include <sys/resource.h> // getpriority(), setpriority()
-
-
+#include <signal.h>
+#include <sys/wait.h>
+#include <sys/resource.h>
 
 void manejador_kill(int sig) {
-    (void)sig; // Evitar advertencia de variable no utilizada
+    (void)sig;
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     long int ms = (long int)(now.tv_sec * 1000L + now.tv_nsec / 1000000L);
     printf("Child %d (nice %2d) : \t%ld ms\n", getpid(), getpriority(PRIO_PROCESS, 0), ms);
     exit(EXIT_SUCCESS);
 }
-
 
 int busywork(void)
 {
@@ -33,10 +30,10 @@ int main(int argc, char *argv[])
 {   
     struct sigaction sa;
 
-    sa.sa_handler = manejador_kill; // Asignar la función
-    sigemptyset(&sa.sa_mask);       // No bloquear otras señales durante el manejo
-    sa.sa_flags = 0;                // Configuración por defecto
-
+    sa.sa_handler = manejador_kill;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    
     if (sigaction(SIGTERM, &sa, NULL) == -1) {
 
         perror("Error registrando sigaction");
@@ -59,7 +56,7 @@ int main(int argc, char *argv[])
             if(priority){
                 if (i>19)
                 {
-                    setpriority(PRIO_PROCESS, 0, 19);    /* code */
+                    setpriority(PRIO_PROCESS, 0, 19);
                 }else{
                     setpriority(PRIO_PROCESS, 0, i);
                 }
@@ -68,15 +65,12 @@ int main(int argc, char *argv[])
                     
             busywork();
             exit(EXIT_SUCCESS);
-            
-           // i = childsWants; Para salir del bucle
         }
     }
     if (atoi(argv[2]) > 0 ){
 
         sleep((unsigned int)(atoi(argv[2])));
             
-
     }else{
         pause();
     }
