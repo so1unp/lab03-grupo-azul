@@ -14,9 +14,9 @@ static struct timespec child_start;
 
 void handler(int sig) {
     if (sig == SIGTERM) {
-        struct timespec now;
-        clock_gettime(CLOCK_MONOTONIC, &now);
-        long seconds = now.tv_sec - child_start.tv_sec;
+        struct rusage usage;
+        getrusage(RUSAGE_SELF,&usage);
+        long seconds = usage.ru_utime.tv_sec + usage.ru_stime.tv_sec;
         printf("Child %d (nice %2d):\t%3ld\n", 
                getpid(), 
                getpriority(PRIO_PROCESS, 0), 
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
             clock_gettime(CLOCK_MONOTONIC, &child_start);
             
             if (reducir == 1) {
-                int nice_val = 19 - i;
+                int nice_val = i;
                 if (setpriority(PRIO_PROCESS, 0, nice_val) == -1) {
                     perror("setpriority");
                 }
